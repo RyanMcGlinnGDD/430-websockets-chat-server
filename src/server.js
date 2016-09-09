@@ -67,8 +67,6 @@ const onDisconnect = (sock) => {
 io.sockets.on('connection', (socket) => {
   console.log('connecting');
 
-  socket.send('thing', { hello: 'world' });
-
   onJoined(socket);
   onMsg(socket);
   onDisconnect(socket);
