@@ -1,6 +1,9 @@
 {
   "name": "006-websockets-chat-server",
   "version": "1.0.0",
+  "engines": {
+    "node": "6.5.0"
+  },
   "main": "index.js",
   "scripts": {
     "start": "node ./src/server.js",
