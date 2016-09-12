@@ -13,31 +13,100 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
     <script type="text/babel">
+        var usernameStore = "";
+
+        //fires when connect button is clicked
         const connectSocket = (e) => {
+            //reference required fields
             var message = document.querySelector("#message");
             var chat = document.querySelector("#chat");
+            var username = document.querySelector("#username");
+            
+            //disable button when a username is submitted. Enable send
+            var connect = document.querySelector("#connect");
+            connect.disabled = true;
+            const send = document.querySelector("#send");
+            send.disabled = false;
+            
+            //establish connection to the socket
             var socket = io.connect();
             
+            //connect event handler
             socket.on('connect', () => {
                 console.log('connecting');
                 
-                let user = document.querySelector("#username").value;
+                usernameStore = username.value;
                 
-                if(!user){
-                    user = 'unknown';
+                if(!usernameStore){
+                    usernameStore = 'unknown';
                 }
-                socket.emit('join', { name: user });
+                socket.emit('join', { name: usernameStore });
             });
             
+            //event handler, when msg is 
             socket.on('msg', (data) => {
                 console.log(data);
+                chat.innerHTML += data.name + ": " + data.msg + "\n";
+            });
+            
+            //if an error is received, undo the changes to button statuses
+            socket.on('joinError', (data) => {
+                connect.disabled = false;
+                send.disabled = true;
+            });
+            
+            socket.on('meMsg', (data) => {
+                console.log(data);
+                chat.innerHTML += `${data.name} ${data.msg}\n`;
+            });
+            
+            socket.on('roll', (data) => {
+                console.log(data);
+                chat.innerHTML += `${data.name} rolled a ${data.result}\n`;
             });
         };
 
+        //fires when message button is clicked, emit msgToServer
+        const sendMessage = (e) => {
+            //establish connection to the socket
+            var socket = io.connect();
+            
+            //get the entryfield
+            var message = document.querySelector("#message");
+            //save text
+            var messageText = message.value;
+            if(messageText !== ""){
+                //clear the text
+                message.value = "";
+                //emit the text
+                socket.emit('msgToServer', { name: usernameStore, msg: messageText });
+            }
+            
+        };
+
+        /*//fires when the tab is closed
+        const handleDisconnect = (e) => {
+            //if valid, means that a connection was made
+            if(usernameStore !== ""){
+                //establish connection to the socket
+                var socket = io.connect();
+                socket.emit('handledDisconnect', { name: usernameStore});
+                alert("I'm a computer");
+            }
+        };*/
+
+        //initialization
         const init = () => {
+            
             //connect button + click event
             const connect = document.querySelector("#connect");
             connect.addEventListener('click', connectSocket);
+            
+            const send = document.querySelector("#send");
+            send.addEventListener('click', sendMessage);
+            send.disabled = true;
+            
+            //window.onunload = handleDisconnect;
         };
 
         window.onload = init;
@@ -58,6 +127,9 @@
 	<input id="message" name="message" type="text"/>
 	<input id="send" type="button" value="send" />
 	
-	<textarea id="chat" rows="20" cols="40" readonly> </textarea>
+	<textarea id="chat" rows="20" cols="40" readonly></textarea>
+    <p>#1 This chat application prevents duplicate usernames</p>
+    <p>#2 Use "/me " to act out an action!</p>
+    <p>#3 Use "/roll" to simulate a 6d1 die roll!</p>
 </body>
 </html>

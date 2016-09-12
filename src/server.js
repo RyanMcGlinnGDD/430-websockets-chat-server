@@ -23,45 +23,93 @@ console.log(`listening on 127.0.0.1: ${port}`);
 const io = socketio(app);
 
 // object to hold all connected servers
-const users = {};
+const users = [];
 
 const onJoined = (sock) => {
   const socket = sock;
 
   socket.on('join', (data) => {
-    // message back to new user
-    const joinMsg = {
-      name: 'server',
-      msg: `There are ${Object.keys(users).length} users online`,
-    };
+        // add data to the users array, check for uniqueness
+    let addFlag = true;
+    for (const piece of users) {
+      if (piece === data.name) {
+        addFlag = false;
+        break;
+      }
+    }
+    if (addFlag) {
+      users.push(data.name);
 
-    socket.name = data.name;
-    socket.emit('msg', joinMsg);
+            // message back to new user
+      const joinMsg = {
+        name: 'server',
+        msg: `There are ${Object.keys(users).length} users online`,
+      };
 
-    socket.join('room1');
+      socket.name = data.name;
+      socket.emit('msg', joinMsg);
 
-    // announce to everone in room
-    const response = {
-      name: 'server',
-      msg: `${data.name} has joined the room.`,
-    };
-    socket.broadcast.to('room1').emit('msg', response);
+      socket.join('room1');
 
-    console.log(`${data.name} joined`);
-    socket.emit('msg', { name: 'server', msg: 'You joined the room' });
+            // announce to everone in room
+      const response = {
+        name: 'server',
+        msg: `${socket.name} joined the room.`,
+      };
+      socket.broadcast.to('room1').emit('msg', response);
+
+      console.log(`${data.name} connected`);
+      socket.emit('msg', { name: 'server', msg: 'You joined the room' });
+    }
+    else {
+      socket.emit('msg', { name: 'server', msg: `Error: username ${data.name} already in use.` });
+      socket.emit('joinError');
+    }
   });
 };
 
 const onMsg = (sock) => {
-  const socket = sock;
+    const socket = sock;
 
-  socket.on('msgToServer', (data) => {
-    io.sockets.in('room1').emit('msg', { name: socket.name, msg: data.msg });
-  });
+    socket.on('msgToServer', (data) => {
+        //ensure that the string is long enough
+        if(data.msg === '/roll'){
+            var rollResult = Math.floor(Math.random() * (5 + 1)) + 1;
+            io.sockets.in('room1').emit('roll', { name: data.name, result: rollResult });
+            console.log(`${data.name} rolled a ${rollResult}`);
+        }
+        else if(data.msg.length > 4 && data.msg.substring(0,4) === "/me "){
+            var segment = data.msg.substring(4,data.msg.length);
+            io.sockets.in('room1').emit('meMsg', { name: data.name, msg: segment });
+            console.log(`${data.name} ${segment}`);
+        }
+        //if not a special message, send a normal message
+        else{
+            io.sockets.in('room1').emit('msg', { name: data.name, msg: data.msg });
+            console.log(`${data.name}: ${data.msg}`);
+        }
+    
+    });
 };
 
 const onDisconnect = (sock) => {
-  const socket = sock;
+    const socket = sock;
+    socket.on('disconnect', () => {
+        // remove from user list
+        var removalIndex = 0;
+        for(let piece of users){
+            if(piece === socket.name){
+                break;
+            }
+            removalIndex++;
+        }
+        users.splice(removalIndex, 1);
+        
+        // announce and exit the hard coded room
+        io.sockets.in('room1').emit('msg', { name: 'server', msg: `${socket.name} left the room.` });
+        socket.leave('room1');
+        console.log(`${socket.name} disconnected`);
+    });
 };
 
 io.sockets.on('connection', (socket) => {
